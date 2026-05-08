@@ -1,53 +1,84 @@
-cabal-version:      2.4
-name:               haskell
-version:            0.1.0.0
+cabal-version: 2.2
 
--- A short (one-line) description of the package.
--- synopsis:
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
 
--- A longer description of the package.
--- description:
+name:           haskell
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/haskell#readme>
+homepage:       https://github.com/githubuser/haskell#readme
+bug-reports:    https://github.com/githubuser/haskell/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2026 Author name here
+license:        BSD-3-Clause
+build-type:     Simple
 
--- A URL where users can report bugs.
--- bug-reports:
+source-repository head
+  type: git
+  location: https://github.com/githubuser/haskell
 
--- The license under which the package is released.
--- license:
-author:             SamokhinIlya
-maintainer:         samokhin.ilya.97@gmail.com
+library
+  other-modules:
+      Paths_haskell
+  autogen-modules:
+      Paths_haskell
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , h-raylib
+    , split
+  default-language: GHC2024
 
--- A copyright notice.
--- copyright:
--- category:
-extra-source-files: CHANGELOG.md
+executable haskell-exe
+  main-is: Main.hs
+  other-modules:
+      Canvas
+      Game
+      Game.Draw
+      Game.Field
+      Game.Input
+      Game.Piece
+      Game.Timer
+      Input
+      Paths_haskell
+  autogen-modules:
+      Paths_haskell
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , h-raylib
+    , haskell
+    , split
+  default-language: GHC2024
 
-executable haskell
-    main-is:          Main.hs
-    hs-source-dirs:   app
-    other-modules:    Game
-                    , Canvas
-                    , Input
-                    , Game.Draw
-                    , Game.Field
-                    , Game.Input
-                    , Game.Piece
-                    , Game.Timer
-
-    default-extensions:
-                      ImportQualifiedPost
-                    , NamedFieldPuns
-                    , TupleSections
-                    , BinaryLiterals
-                    , NumericUnderscores
-                    , FlexibleInstances
-
-    build-depends:    base ^>=4.17.0.0
-                    , gloss ^>=1.13.2.2
-                    , bytestring
-                    , array
-                    , split
-                    , containers
-
-    default-language: Haskell2010
-    ghc-options:      -O2
-                      -threaded
+test-suite haskell-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_haskell
+  autogen-modules:
+      Paths_haskell
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      array
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , h-raylib
+    , haskell
+    , split
+  default-language: GHC2024

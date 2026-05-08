@@ -1,11 +1,14 @@
-module Main (main) where
+{-# LANGUAGE TemplateHaskell #-}
+
+module Main where
 
 import Prelude hiding (lookup)
 
+import Control.Monad
 import GHC.Float
 import Data.Array.Storable
 import Data.ByteString (ByteString, pack)
-import Data.Map.Strict (Map, empty, insertWith, mapWithKey, lookup)
+import Data.Map.Strict (Map, empty, insertWith, traverseWithKey, lookup)
 import Data.Maybe
 
 import Data.List.NonEmpty (NonEmpty)
@@ -14,26 +17,26 @@ import Data.Word
 import Foreign.Ptr
 import Foreign.ForeignPtr
 
-import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Interact
-import Graphics.Gloss.Interface.IO.Game
+import Raylib.Core (clearBackground, initWindow, setTargetFPS, windowShouldClose, closeWindow, getFrameTime, isKeyDown, isMouseButtonDown)
+import Raylib.Core.Textures
+import Raylib.Core.Text (drawText)
+import Raylib.Types
+  ( Texture
+  , Image (..)
+  , PixelFormat (..)
+  , KeyboardKey (KeyLeft, KeyRight, KeyDown)
+  , MouseButton (MouseButtonLeft, MouseButtonRight)
+  )
+import Raylib.Util (drawing, raylibApplication, WindowResources)
+import Raylib.Util.Colors (lightGray, rayWhite, black, white)
 
 import Game qualified
 
-import Canvas (Canvas, Pixel)
+import Canvas (Canvas)
 import Canvas qualified
 
 import Input hiding (update)
 import Input qualified (update)
-
-main :: IO ()
-main = do
-  d <- mkData (1280, 720)
-  let
-    window           = InWindow "title" (width d, height d) (100, 100)
-    background       = green
-    updatesPerSecond = 60
-  playIO window background updatesPerSecond d render handleEvent update
 
 data Data = Data
   { canvas        :: Canvas
@@ -41,73 +44,86 @@ data Data = Data
   , height        :: Int
   , gameData      :: Game.Data
   , input         :: Input
-  , keyboardState :: Map KbKey (NonEmpty KeyState)
-  , mouseState    :: Map MouseKey (NonEmpty KeyState)
+  , texture       :: Texture
   }
 
 mkData :: (Int, Int) -> IO Data
 mkData (w, h) = do
-  canvas <- newArray ((0, 0), (h - 1, w - 1)) Canvas.black
+  canvas <- newArray ((0, 0), (h - 1, w - 1)) Canvas.blue
+  texture <- loadTextureFromImage Image
+    { image'data = take (4 * w * h) . repeat $ 0
+    , image'width = w
+    , image'height = h
+    , image'mipmaps = 1
+    , image'format = PixelFormatUncompressedR8G8B8A8
+    }
   pure Data
     { canvas        = canvas 
     , width         = w
     , height        = h
     , gameData      = Game.mkData
     , input         = mkInput
-    , keyboardState = empty
-    , mouseState    = empty
+    , texture       = texture
     }
-
-render :: Data -> IO Picture
-render d = do
-  withStorableArray (canvas d) toBitmap
-  where
-    toBitmap ptr = do
-      let format = BitmapFormat TopToBottom PxRGBA
-      foreignPtr <- newForeignPtr_ (castPtr ptr :: Ptr Word8)
-      pure $ bitmapOfForeignPtr (width d) (height d) format foreignPtr False
-
-handleEvent :: Event -> Data -> IO Data
-handleEvent event d = pure $ case event of
-  EventKey (SpecialKey  key) state _ _ -> fromMaybe d $ updateKeyboardState key state
-  EventKey (MouseButton key) state _ _ -> fromMaybe d $ updateMouseState key state
-  _                                    -> d
-  where
-    updateKeyboardState :: SpecialKey -> KeyState -> Maybe Data
-    updateKeyboardState key state = do
-      k <- case key of
-        KeyDown  -> Just KbDown
-        KeyLeft  -> Just KbLeft
-        KeyRight -> Just KbRight
-        _        -> Nothing
-      Just d { keyboardState = insertWith NonEmpty.append k (NonEmpty.singleton state) (keyboardState d) }
-
-    updateMouseState :: MouseButton -> KeyState -> Maybe Data
-    updateMouseState key state = do
-      k <- case key of
-        LeftButton  -> Just MouseLeft
-        RightButton -> Just MouseRight
-        _           -> Nothing
-      Just d { mouseState = insertWith NonEmpty.append k (NonEmpty.singleton state) (mouseState d) }
 
 update :: Float -> Data -> IO Data
 update dt d = do
-  let input' = updateInput d
+  input' <- updateInput d
   (gameData', canvas') <- Game.update (gameData d) (canvas d) input' (float2Double dt)
   pure d
     { canvas = canvas'
     , gameData = gameData'
     , input = input'
-    , keyboardState = empty
-    , mouseState = empty
     }
   where
-    updateInput d = (input d)
-      { keyboard = mapWithKey (updateKey $ keyboardState d) (keyboard $ input d)
-      , mouse    = mapWithKey (updateKey $ mouseState    d) (mouse    $ input d)
-      }
-      where
-        updateKey events key prev =
-          let defaultButton = Input.update (isPressed prev) prev
-          in
-            maybe defaultButton (foldr (Input.update . (==Down)) prev) (lookup key events)
+    updateInput :: Data -> IO Input
+    updateInput d = do
+      k <- traverseWithKey (updateKey isKbKeyDown   ) (keyboard $ input d)
+      m <- traverseWithKey (updateKey isMouseKeyDown) (mouse    $ input d)
+      return (input d)
+        { keyboard = k 
+        , mouse    = m
+        }
+
+    updateKey :: (a -> IO Bool) -> a -> Button -> IO Button 
+    updateKey isDown key prev = do
+      curr <- isDown key
+      return $ Input.update curr prev
+
+    isKbKeyDown :: KbKey -> IO Bool
+    isKbKeyDown key = isKeyDown $ case key of
+      KbLeft -> KeyLeft
+      KbRight -> KeyRight
+      KbDown -> KeyDown
+
+    isMouseKeyDown :: MouseKey -> IO Bool
+    isMouseKeyDown key = isMouseButtonDown $ case key of
+      MouseLeft -> MouseButtonLeft
+      MouseRight -> MouseButtonRight
+
+startup :: IO Data
+startup = do
+  let w = 1280
+      h = 720
+  _ <- initWindow w h "title"
+  setTargetFPS 60
+  mkData (w, h)
+
+mainLoop :: Data -> IO Data
+mainLoop oldD = do
+  dt <- getFrameTime
+  d <- update dt oldD
+  withStorableArray (canvas d) $ \ptr ->
+    updateTexture (texture d) (castPtr ptr)
+
+  drawing $ do
+    drawTexture (texture d) 0 0 white
+  return d
+
+shouldClose :: Data -> IO Bool
+shouldClose _ = windowShouldClose
+
+teardown :: Data -> IO ()
+teardown _ = closeWindow Nothing
+
+raylibApplication 'startup 'mainLoop 'shouldClose 'teardown
