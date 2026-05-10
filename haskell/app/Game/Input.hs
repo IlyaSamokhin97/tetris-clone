@@ -1,4 +1,7 @@
-module Game.Input where
+module Game.Input
+  ( Move (..), mkMove
+  , Turn (..), mkTurn
+  ) where
 
 import Data.Map.Strict
 

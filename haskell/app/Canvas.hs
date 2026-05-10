@@ -1,4 +1,10 @@
-module Canvas where
+module Canvas
+  ( Canvas
+  , Pixel
+  , black
+  , white
+  , blue
+  ) where
 
 import Data.Array.Storable
 import Data.Word

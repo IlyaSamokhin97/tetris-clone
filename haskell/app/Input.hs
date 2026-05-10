@@ -45,8 +45,8 @@ data Button = Button
   }
 
 instance Show Button where
-  show b =
-    (if curr b then "_" else "T") <> (if prev b then "_" else "T")
+  show Button { curr, prev } = map toChar [curr, prev]
+    where toChar b = if b then '_' else 'T'
 
 mkButton :: Button
 mkButton = Button
@@ -55,13 +55,15 @@ mkButton = Button
   }
 
 update :: Bool -> Button -> Button
-update newCurr old = Button
+update curr' old = Button
   { prev = curr old
-  , curr = newCurr
+  , curr = curr'
   }
 
 isPressed :: Button -> Bool
 isPressed = curr
 
 justPressed :: Button -> Bool
-justPressed b = not (prev b) && curr b
+justPressed = \case
+  Button { prev = False, curr = True } -> True
+  _                                    -> False

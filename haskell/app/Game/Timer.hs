@@ -1,4 +1,7 @@
-module Game.Timer (Timer, mkTimer, tick) where
+module Game.Timer
+  ( Timer , mkTimer
+  , tick
+  ) where
 
 data Timer = Timer
   { timespan :: Double
@@ -6,15 +9,13 @@ data Timer = Timer
   } deriving Show
 
 mkTimer :: Double -> Timer
-mkTimer span = Timer
-  { timespan = span
-  , current  = span
+mkTimer x = Timer
+  { timespan = x
+  , current  = x
   }
 
 tick :: Double -> Timer -> (Timer, Bool)
-tick dt t =
-  let newCurrent = current t - dt
-  in
-    if newCurrent < 0.0
-    then (t { current = timespan t }, True )
-    else (t { current = newCurrent }, False)
+tick dt t@Timer { timespan, current } =
+  if current - dt < 0.0
+  then (t { current = timespan     }, True )
+  else (t { current = current - dt }, False)

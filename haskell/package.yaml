@@ -17,6 +17,9 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 language: GHC2024
 
+default-extensions:
+- LambdaCase
+
 # default-extensions:
 #                       ImportQualifiedPost
 #                     , NamedFieldPuns

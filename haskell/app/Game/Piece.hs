@@ -1,7 +1,6 @@
 module Game.Piece
-  ( Piece
-  , mkPiece
-  , PieceType (Square, Stick, L, ReverseL, T, S, ReverseS)
+  ( Piece, mkPiece
+  , PieceType (..)
   , dims
   , rowsCols
   , blueprint
@@ -10,8 +9,9 @@ module Game.Piece
   ) where
 
 import GHC.Arr
+import Data.Bifunctor
 import Data.Bits ((.&.))
-import Data.List
+import Data.List (findIndex , sortOn)
 import Data.List.Split
 import Data.Maybe
 import Data.Word
@@ -20,10 +20,15 @@ import Game.Field hiding (dims)
 import Game.Field qualified as Field (dims)
 import Game.Input
 
-data Piece = Piece
-  { ty :: PieceType
-  , rotations :: Int
-  } deriving Show
+data Piece = Piece PieceType Rotation
+  deriving Show
+
+data Rotation
+  = Deg0
+  | Deg90
+  | Deg180
+  | Deg270
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 data PieceType
   = Square
@@ -33,61 +38,48 @@ data PieceType
   | T
   | S
   | ReverseS
-  deriving (Show, Enum, Bounded)
+  deriving (Show, Eq, Ord, Enum, Bounded)
 
 mkPiece :: Piece
-mkPiece = Piece
-  { ty        = Square
-  , rotations = 0
-  }
+mkPiece = Piece Square Deg0
 
 next :: Piece -> Piece
-next p = p
-  { ty        = toEnum (succ (fromEnum (ty p)) `mod` (fromEnum (maxBound :: PieceType) + 1))
-  , rotations = 0
-  }
+next (Piece ty _) = Piece (if ty < maxBound then succ ty else minBound) Deg0
 
--- TODO: mod or %?
 turn :: Turn -> Piece -> Piece
-turn TurnLeft  p = p { rotations = pred (rotations p) `mod` 4 }
-turn TurnRight p = p { rotations = succ (rotations p) `mod` 4 }
+turn t (Piece ty rot) = Piece ty $ case t of
+  TurnLeft  -> if minBound < rot then pred rot else maxBound
+  TurnRight -> if rot < maxBound then succ rot else minBound
 
 dims :: Piece -> (Int, Int)
 dims p =
-  let
+  ( maybe h (h-) . findIndex (elem Falling) . reverse $ rows
+  , maybe w (w-) . findIndex (elem Falling) . reverse $ cols
+  )
+  where
     b      = blueprint p
     (h, w) = Field.dims b
     (rows, cols) = rowsCols b
-  in 
-    ( maybe h (h-) . findIndex (elem Falling) . reverse $ rows
-    , maybe w (w-) . findIndex (elem Falling) . reverse $ cols
-    )
 
 rowsCols :: Array Pos Cell -> ([[Cell]], [[Cell]])
 rowsCols a =
-  ( chunksOf w . map snd .               assocs $ a
-  , chunksOf h . map snd . sortOn cols . assocs $ a
+  ( chunksOf w . map snd                 $ assocs a
+  , chunksOf h . map snd . sortOn column $ assocs a
   )
   where
     (h, w) = Field.dims a
-    cols (Pos (_, x), _) = x
+    column (Pos (_, x), _) = x
 
 blueprint :: Piece -> Array Pos Cell
-blueprint p =
-  let
-    rotated = iterate (rotate False) bp !! rotations p
-    (srcY, srcX) =
-      let (rows, cols) = rowsCols rotated
-      in
-        ( fromMaybe 0 $ findIndex (elem Falling) rows
-        , fromMaybe 0 $ findIndex (elem Falling) cols
-        )
-    getOrEmpty i a = if inRange (bounds a) i then a ! i else Empty
-  in
-    array (bounds rotated)
-      [(Pos (y, x), getOrEmpty (Pos (y + srcY, x + srcX)) rotated) | Pos (y, x) <- range (bounds rotated)]
+blueprint (Piece ty rot) =
+  array (bounds rotated)
+    [(i, fromMaybe Empty $ rotated !? (i +. src)) | i <- indices rotated]
   where 
-    bp = mkBlueprint $ case ty p of
+    src       = Pos $ bimap fallingIx fallingIx $ rowsCols rotated
+    fallingIx = fromMaybe 0 . findIndex (elem Falling)
+    rotated   = iterate (rotate False) bp !! fromEnum rot
+
+    bp = mkBlueprint $ case ty of
       Square   -> [ 0b_1100
                   , 0b_1100
                   , 0b_0000
@@ -124,17 +116,15 @@ blueprint p =
                   , 0b_0000
                   ]
 
-mkBlueprint :: [Word8] -> Array Pos Cell
-mkBlueprint bs = listArray (Pos (0, 0), Pos (3, 3)) $ concatMap fromBin bs
+    mkBlueprint :: [Word8] -> Array Pos Cell
+    mkBlueprint bs = listArray (Pos (0, 0), Pos (3, 3)) $ concatMap fromBin bs
 
-fromBin :: Word8 -> [Cell]
-fromBin bin = map (fromBool . (/= 0) . (.&. bin)) [ 0b_1000
-                                                  , 0b_0100
-                                                  , 0b_0010
-                                                  , 0b_0001
-                                                  ]
-
-fromBool :: Bool -> Cell
-fromBool True  = Falling
-fromBool False = Empty
+    fromBin bin = map (fromBool . (/= 0) . (.&. bin)) [ 0b_1000
+                                                      , 0b_0100
+                                                      , 0b_0010
+                                                      , 0b_0001
+                                                      ]
+    fromBool = \case
+      True  -> Falling
+      False -> Empty
     
