@@ -1,14 +1,14 @@
 module Game.Field
-  ( Cell (..)
+  ( module Data.Array.IArray
+  , Cell (..)
   , Pos (..), (+.)
-  , Field , mkField, (!?)
+  , Field, mkField
   , dims
   , copyIf
   , rotate
   ) where
 
-import GHC.Arr
-import GHC.Ix
+import Data.Array.IArray
 
 data Cell
   = Empty
@@ -24,15 +24,9 @@ newtype Pos
   deriving (Eq, Ord, Show)
 
 instance Ix Pos where
-  range (Pos b, Pos e) =
-    map Pos $ range (b, e)
-
-  index (Pos b, Pos e) (Pos i)
-    | inRange (b, e) i = unsafeIndex (b, e) i
-    | otherwise        = GHC.Ix.indexError (b, e) i "Pos"
-
-  inRange (Pos b, Pos e) (Pos i) =
-    inRange (b, e) i
+  range (Pos b, Pos e)           = map Pos $ range (b, e)
+  index (Pos b, Pos e) (Pos i)   = index (b, e) i
+  inRange (Pos b, Pos e) (Pos i) = inRange (b, e) i
 
 -- same fixity as +
 infixl 6 +.
@@ -40,11 +34,6 @@ infixl 6 +.
 Pos (ay, ax) +. Pos (by, bx) = Pos $ (ay + by, ax + bx)
 
 type Field = Array Pos Cell
-
--- same fixity as !
-infixr 8 !?
-(!?) :: Ix i => Array i a -> i -> Maybe a
-a !? i = if inRange (bounds a) i then Just (a ! i) else Nothing
 
 mkField :: Field
 mkField = array bounds_ [(i, Empty) | i <- range bounds_]

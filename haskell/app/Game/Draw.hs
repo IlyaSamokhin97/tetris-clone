@@ -4,7 +4,6 @@ module Game.Draw
   ) where
 
 import Control.Monad
-import Data.Array
 import Data.Array.Storable
 import Data.Bifunctor
 

@@ -8,7 +8,6 @@ module Game.Piece
   , next
   ) where
 
-import GHC.Arr
 import Data.Bifunctor
 import Data.Bits ((.&.))
 import Data.List (findIndex , sortOn)

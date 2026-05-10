@@ -1,6 +1,5 @@
 module Game (Data, mkData, update) where
 
-import GHC.Arr
 import Data.Array.IO
 import Data.List (find)
 import Data.Maybe
