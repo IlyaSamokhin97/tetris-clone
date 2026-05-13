@@ -1,5 +1,6 @@
 module Game.Draw
-  ( field
+  ( Point
+  , field
   , clear
   ) where
 

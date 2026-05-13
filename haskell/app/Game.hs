@@ -64,7 +64,7 @@ spawned mt mov hasTicked pos d =
     hasFullRows = isJust . find (all (==Frozen)) $ rows
     newField'   = newField // [(Pos (y, x), Disappearing) | y <- frozenRowYs, x <- frozenRowXs]
       where
-        frozenRowYs = map fst . filter (all (==Frozen) . snd) $ zip [0..] rows
+        frozenRowYs = [y | (y, cells) <- zip [0..] rows, all (==Frozen) cells]
         frozenRowXs = [0 .. snd (dims newField) - 1]
   in d
     { state =
@@ -110,33 +110,41 @@ fallingToFrozen = \case
 
 update :: Data -> Canvas -> Input -> Double -> IO (Data, Canvas)
 update d canvas input dt = do
-  let
-    mov                        = mkMove input
-    t                          = mkTurn input
-    (gravityTimer', hasTicked) = tick dt (gravityTimer d)
-    d' = case state d of
-      SpawnPiece                               -> spawnPiece d
-      Spawned pos                              -> spawned t mov hasTicked pos d
-      BlinkDisappearingRows { doShow, blinks } -> blinkDisappearingRows doShow blinks dt d
-      ClearDisappearingRows                    -> clearDisappearingRows d
-      FallAfterClear                           -> if hasTicked then fallAfterClear d else d
-      ChangePiece                              -> d { state = SpawnPiece, piece = next $ piece d }
+  let mov = mkMove input
+      t   = mkTurn input
+      (gravityTimer', hasTicked) = tick dt (gravityTimer d)
+      d' = case state d of
+        SpawnPiece                               -> spawnPiece d
+        Spawned pos                              -> spawned t mov hasTicked pos d
+        BlinkDisappearingRows { doShow, blinks } -> blinkDisappearingRows doShow blinks dt d
+        ClearDisappearingRows                    -> clearDisappearingRows d
+        FallAfterClear                           -> if hasTicked then fallAfterClear d else d
+        ChangePiece                              -> d { state = SpawnPiece, piece = next $ piece d }
 
-  -- draw
+  draw d' canvas
+  pure (d' { gravityTimer = gravityTimer' }, canvas)
+      
+draw :: Data -> Canvas -> IO ()
+draw dat canvas = do
+  fieldPos <- getFieldPos canvas
   Draw.clear canvas
-
-  (_, (ch, cw)) <- getBounds canvas
-  let
+  Draw.field (field dat)                    fieldPos            cellPx (drawDisappearing dat) canvas
+  Draw.field (blueprint $ next $ piece dat) (piecePos fieldPos) cellPx False                 canvas
+  where
     cellPx = 30
-    drawDisappearing = case state d' of
+
+    getFieldPos c = do
+      (_, (ch, cw)) <- getBounds c
+      return (ch `div` 2 - (fh * cellPx) `div` 2, cw `div` 2 - (fw * cellPx) `div` 2)
+
+    piecePos (y, x) =
+      (y, x + fw * cellPx + cellPx)
+
+    (_, Pos (fh, fw)) = bounds $ field dat
+    
+    drawDisappearing d = case state d of
       BlinkDisappearingRows { doShow } -> doShow
       _                                -> False
-    (_, Pos (fh, fw)) = bounds $ field d'
-    (y0, x0) = (ch `div` 2 - (fh * cellPx) `div` 2, cw `div` 2 - (fw * cellPx) `div` 2)
-
-  Draw.field (field d')                    (y0,                        x0) cellPx drawDisappearing canvas
-  Draw.field (blueprint $ next $ piece d') (y0, x0 + fw * cellPx + cellPx) cellPx False            canvas
-  pure (d' { gravityTimer = gravityTimer' }, canvas)
 
 spawn :: Piece -> (Int, Int) -> Field -> Field
 spawn piece pos = copyIf (==Falling) (blueprint piece) pos (Piece.dims piece)
@@ -153,8 +161,8 @@ tryFall field = do
 
     xs = [0 .. width - 1]
 
-    isFloating y = any (\x -> field ! Pos (y    , x) == Falling) xs
-                && all (\x -> field ! Pos (y + 1, x) == Empty  ) xs
+    isFloating y = any (==Falling) [field ! Pos (y, x)     | x <- xs]
+                && all (==Empty)   [field ! Pos (y + 1, x) | x <- xs]
 
 tryMovePiece :: (Int, Int) -> Piece -> Field -> Move -> Maybe (Field, (Int, Int))
 tryMovePiece pos piece field m = do
